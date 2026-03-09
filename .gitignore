@@ -22,3 +22,5 @@ logs/
 .vscode/
 *.swp
 *.swo
+
+applications.csv
