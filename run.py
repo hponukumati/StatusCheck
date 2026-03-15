@@ -34,6 +34,19 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 
+def _is_from_self(from_header: str) -> bool:
+    """
+    Return True if the email appears to be sent by the user themself.
+
+    We check configured USER_EMAILS (from STATUSCHECK_USER_EMAILS) against the
+    From header. If no USER_EMAILS are configured, we assume nothing is "self".
+    """
+    if not getattr(config, "USER_EMAILS", None):
+        return False
+    header = (from_header or "").lower()
+    return any(email in header for email in config.USER_EMAILS)
+
+
 def build_application_query(days_back: int) -> str:
     """Gmail q string for application confirmation emails (searches subject + body)."""
     after = after_date_query(days_back)
@@ -66,6 +79,9 @@ def run_applications(service, csv_path: Path, days_back: int) -> int:
             details = get_message_details(service, mid)
         except Exception as e:
             log.warning("Failed to fetch message %s: %s", mid, e)
+            continue
+        # Skip replies sent by you so we only track employer-originated emails.
+        if _is_from_self(details.get("from", "")):
             continue
         company, position = parse_application_email(details["subject"], details["from"])
         applied_date = details["date"].strftime("%Y-%m-%d") if details["date"] else ""

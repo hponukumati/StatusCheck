@@ -40,6 +40,12 @@ Sign in with your Google account and allow Gmail read access. Tokens are saved t
 ## Usage
 
 - **Manual run**: `python run.py`
+- **Your email (recommended)**: Set your Gmail address so the script ignores your own replies (avoids duplicate rows when you reply to application threads):
+  ```bash
+  export STATUSCHECK_USER_EMAILS="yourname@gmail.com"
+  python run.py
+  ```
+  For multiple addresses use a comma-separated list: `"email1@gmail.com, email2@work.com"`.
 - **CSV**: By default `applications.csv` is created in the project directory. Override with:
   ```bash
   export STATUSCHECK_CSV_PATH=/path/to/applications.csv
@@ -59,9 +65,9 @@ Sign in with your Google account and allow Gmail read access. Tokens are saved t
 
 2. Edit crontab: `crontab -e`
 
-3. Add a line to run at 11 PM every day (adjust paths to your system):
+3. Add a line to run at 11 PM every day (adjust paths and email to your system). Set `STATUSCHECK_USER_EMAILS` in the cron line so your replies are not added as applications:
    ```
-   0 23 * * * /path/to/StatusCheck/venv/bin/python /path/to/StatusCheck/run.py >> /path/to/StatusCheck/logs/cron.log 2>&1
+   0 23 * * * STATUSCHECK_USER_EMAILS="yourname@gmail.com" /path/to/StatusCheck/venv/bin/python /path/to/StatusCheck/run.py >> /path/to/StatusCheck/logs/cron.log 2>&1
    ```
 
 Use your actual project path, e.g. `/Users/harshaponukumati/Projects/StatusCheck`.

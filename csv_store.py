@@ -1,5 +1,6 @@
 """CSV store for applications: add rows, list applied companies, update status to Rejected."""
 import csv
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
@@ -36,11 +37,22 @@ def load_rows(path: Path) -> list[dict]:
 
 def save_rows(path: Path, rows: list[dict]) -> None:
     """Write all rows back to CSV."""
+    def sort_key(r: dict):
+        # applied_date is stored as YYYY-MM-DD; unknown/invalid dates go last
+        s = (r.get("applied_date") or "").strip()
+        try:
+            dt = datetime.strptime(s, "%Y-%m-%d")
+        except ValueError:
+            dt = datetime.min
+        # Newest first; break ties by message id for stability
+        return (dt, (r.get("application_email_id") or ""))
+
+    rows_sorted = sorted(rows, key=sort_key, reverse=True)
     path = Path(path)
     with open(path, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=CSV_HEADER)
         writer.writeheader()
-        writer.writerows(rows)
+        writer.writerows(rows_sorted)
 
 
 def has_application_email_id(path: Path, email_id: str) -> bool:
