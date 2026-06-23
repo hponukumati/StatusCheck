@@ -51,10 +51,23 @@ Sign in with your Google account and allow Gmail read access. Tokens are saved t
   export STATUSCHECK_CSV_PATH=/path/to/applications.csv
   python run.py
   ```
+  or `python run.py --csv-path /path/to/applications.csv` (the flag takes precedence over the env var).
 - **Search window**: The script looks at the last 30 days of email. Change with:
   ```bash
   export STATUSCHECK_DAYS_BACK=14
   ```
+  or `python run.py --days-back 14`.
+- **Dry run**: Preview what a run would do (new applications, status changes, digest contents) without writing to the CSV or sending email. Useful when tweaking keyword lists in `config.py`:
+  ```bash
+  python run.py --dry-run
+  ```
+  See all options with `python run.py --help`.
+- **Daily digest email (optional)**: Set a recipient address to get a summary email after each run listing today's new applications, interviews, offers, and rejections. No email is sent if nothing changed.
+  ```bash
+  export STATUSCHECK_DIGEST_EMAIL="yourname@gmail.com"
+  python run.py
+  ```
+  This requires the `gmail.send` scope in addition to `gmail.readonly`. If you set up `token.json` before this feature existed, **delete `token.json` and run `python run.py` once interactively** to re-authorize with the new scope.
 
 ## Running daily at end of day (cron)
 
@@ -79,15 +92,18 @@ Use your actual project path, e.g. `/Users/harshaponukumati/Projects/StatusCheck
 | company_name         | Extracted from subject/sender                |
 | position             | Role if detectable from subject              |
 | applied_date         | Date the application email was received      |
-| status               | `Applied` or `Rejected`                      |
+| status               | `Applied`, `Interview`, `Offer`, or `Rejected` |
 | application_email_id | Gmail message ID (avoids duplicates)        |
 | subject              | Application email subject                    |
 | sender_email         | From header (e.g. sender address or name)    |
+| confidence           | `high` or `low` — how confident the parser is in `company_name`. `low` rows are worth a manual check. |
 
 ## How it works
 
 - **New applications**: Searches Gmail (subject and body) for “application received”, “we received your application”, or “thank you for applying”. Each new message (not already in the CSV) is parsed for company name and appended with status `Applied`.
-- **Rejections**: Searches for emails with “unfortunately” (and similar) in the subject. For each such email, the script checks whether any `Applied` row’s company name appears in the rejection’s subject or body; those rows are updated to `Rejected`.
+- **Interviews**: Searches for interview-invite phrasing (e.g. “schedule an interview”, “phone screen”). Matches against `Applied` rows by company name and updates them to `Interview`.
+- **Offers**: Searches for offer phrasing (e.g. “pleased to offer”, “offer letter”). Matches against `Applied` or `Interview` rows and updates them to `Offer`.
+- **Rejections**: Searches for emails with “unfortunately” (and similar) in the subject/body. Matches against `Applied`, `Interview`, or `Offer` rows by company name and updates them to `Rejected`. Rejection is checked last each run, so it always takes precedence over an interview/offer match for the same company.
 
 ## Troubleshooting
 

@@ -17,6 +17,31 @@ APPLICATION_SUBJECT_KEYWORDS = [
     "thank you for applying",
 ]
 
+# Interview-invite keywords (searched in subject and body)
+INTERVIEW_KEYWORDS = [
+    "schedule an interview",
+    "schedule a call",
+    "schedule a phone screen",
+    "phone screen",
+    "would like to interview",
+    "next steps in the interview process",
+    "set up a time to chat",
+    "set up an interview",
+    "interview invitation",
+    "invite you to interview",
+]
+
+# Offer keywords (searched in subject and body)
+OFFER_KEYWORDS = [
+    "pleased to offer",
+    "happy to offer",
+    "offer letter",
+    "extend an offer",
+    "job offer",
+    "offer of employment",
+    "congratulations, we",
+]
+
 # Rejection keywords (searched in subject and body)
 REJECTION_KEYWORDS = [
     "unfortunately",
@@ -45,4 +70,8 @@ USER_EMAILS = [
     for email in _user_emails_raw.split(",")
     if email.strip()
 ]
+
+# If set, a daily digest email summarizing today's changes is sent to this address
+# after each run. Leave unset to disable the digest.
+DIGEST_EMAIL = os.environ.get("STATUSCHECK_DIGEST_EMAIL", "").strip()
 

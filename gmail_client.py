@@ -1,16 +1,20 @@
-"""Gmail API client: authentication, search, and message fetching."""
+"""Gmail API client: authentication, search, message fetching, and sending."""
 import base64
 import os
 import re
 from datetime import datetime, timedelta
+from email.mime.text import MIMEText
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 
-# Gmail read-only scope
-SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
+# Read-only for searching/fetching, send for the daily digest email.
+SCOPES = [
+    "https://www.googleapis.com/auth/gmail.readonly",
+    "https://www.googleapis.com/auth/gmail.send",
+]
 
 
 def get_credentials(credentials_path: str = "credentials.json", token_path: str = "token.json"):
@@ -121,6 +125,15 @@ def get_message_details(service, message_id: str):
         "date": date,
         "body": body,
     }
+
+
+def send_email(service, to: str, subject: str, body: str) -> None:
+    """Send a plain-text email via the Gmail API."""
+    message = MIMEText(body)
+    message["to"] = to
+    message["subject"] = subject
+    raw = base64.urlsafe_b64encode(message.as_bytes()).decode("utf-8")
+    service.users().messages().send(userId="me", body={"raw": raw}).execute()
 
 
 def after_date_query(days_back: int) -> str:

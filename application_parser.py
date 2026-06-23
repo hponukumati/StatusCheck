@@ -18,11 +18,27 @@ APPLICATION_SUFFIXES = [
     r"\s+[:\-]\s*([A-Za-z0-9][A-Za-z0-9\s&.,'-]+?)$",
 ]
 
+# Phrases that indicate a segment is status text, not a company name
+# (e.g. "Acme - Application received" -> "Application received" is status text)
+_STATUS_PHRASE_RE = re.compile(r"application|applying|received|submitted|thank you", re.IGNORECASE)
+
 
 def extract_company_from_subject(subject: str) -> Optional[str]:
     """Try to extract company name from subject. Returns None if nothing clear."""
+    name, _confidence = _extract_company_from_subject_with_confidence(subject)
+    return name
+
+
+def _extract_company_from_subject_with_confidence(subject: str) -> Tuple[Optional[str], str]:
+    """Like extract_company_from_subject, but also reports confidence ("high"/"low").
+
+    "high" means the subject matched a known, specific phrasing (a prefix like
+    "thank you for applying to", an explicit "X - Application received" split, or
+    "Role at Company"). "low" means we fell back to a generic dash/colon split that
+    could easily grab the wrong segment.
+    """
     if not subject or not subject.strip():
-        return None
+        return None, "low"
     subject = subject.strip()
     # Try prefixes first (e.g. "Thank you for applying to Company Name")
     for pat in APPLICATION_PREFIXES:
@@ -32,21 +48,38 @@ def extract_company_from_subject(subject: str) -> Optional[str]:
             # Rest might be "Company Name" or "Role at Company"
             name = _take_first_part(rest)
             if name and len(name) > 1:
-                return name.strip()
-    # Try "Role at Company" or "... - Company"
-    for pat in APPLICATION_SUFFIXES:
+                return name.strip(), "high"
+    # "Company - Application received" style: company comes before the status phrase
+    parts = re.split(r"\s*[:\-]\s*", subject, maxsplit=1)
+    if len(parts) == 2:
+        first, rest = parts[0].strip(), parts[1].strip()
+        if (
+            first
+            and 1 < len(first) < 100
+            and not _STATUS_PHRASE_RE.search(first)
+            and _STATUS_PHRASE_RE.search(rest)
+        ):
+            return first, "high"
+    # "Role at Company" is specific enough to trust
+    m = re.search(APPLICATION_SUFFIXES[1], subject)
+    if m:
+        name = m.group(1).strip()
+        if name and len(name) > 1 and len(name) < 120:
+            return name, "high"
+    # Remaining suffix patterns are generic dash/colon splits - easy to mismatch
+    for pat in (APPLICATION_SUFFIXES[0], APPLICATION_SUFFIXES[2]):
         m = re.search(pat, subject)
         if m:
             name = m.group(1).strip()
             if name and len(name) > 1 and len(name) < 120:
-                return name
+                return name, "low"
     # Fallback: first "word" that looks like a name (e.g. "Acme - Application received")
     parts = re.split(r"\s*[:\-]\s*", subject, maxsplit=1)
     if parts:
         first = parts[0].strip()
         if first and len(first) > 1 and len(first) < 100:
-            return first
-    return None
+            return first, "low"
+    return None, "low"
 
 
 def _take_first_part(s: str) -> str:
@@ -90,12 +123,18 @@ def extract_company_from_sender(from_header: str) -> Optional[str]:
     return None
 
 
-def parse_application_email(subject: str, from_header: str) -> Tuple[str, str]:
-    """Extract (company_name, position). company_name is required; uses sender if subject fails."""
-    company = extract_company_from_subject(subject)
+def parse_application_email(subject: str, from_header: str) -> Tuple[str, str, str]:
+    """Extract (company_name, position, confidence). company_name is required; uses
+    sender if subject fails. confidence is "high" or "low" - "low" means the
+    company name is a guess (sender-domain fallback, generic split, or "Unknown")
+    and may be worth a manual look in the CSV.
+    """
+    company, confidence = _extract_company_from_subject_with_confidence(subject)
     if not company:
         company = extract_company_from_sender(from_header)
+        confidence = "low"
     if not company:
         company = "Unknown"
+        confidence = "low"
     position = extract_position_from_subject(subject)
-    return (company, position)
+    return (company, position, confidence)

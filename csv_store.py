@@ -12,6 +12,7 @@ CSV_HEADER = [
     "application_email_id",
     "subject",
     "sender_email",
+    "confidence",
 ]
 
 
@@ -69,6 +70,7 @@ def add_application(
     subject: str,
     sender_email: str = "",
     position: str = "",
+    confidence: str = "high",
 ) -> None:
     """Append one application row with status Applied."""
     ensure_csv(path)
@@ -81,23 +83,26 @@ def add_application(
         "application_email_id": application_email_id,
         "subject": subject,
         "sender_email": sender_email,
+        "confidence": confidence,
     })
     save_rows(path, rows)
 
 
-def get_applied_rows(path: Path) -> list[dict]:
-    """Return rows where status is Applied (for rejection matching)."""
+def get_rows_with_status(path: Path, statuses: list[str]) -> list[dict]:
+    """Return rows whose status is one of the given statuses."""
     rows = load_rows(path)
-    return [r for r in rows if r.get("status") == "Applied"]
+    return [r for r in rows if r.get("status") in statuses]
 
 
-def update_status_to_rejected(path: Path, company_name: str) -> int:
-    """Set status to Rejected for all rows with this company_name and status Applied. Returns count updated."""
+def update_status(path: Path, company_name: str, new_status: str, from_statuses: list[str]) -> int:
+    """Set status to new_status for rows with this company_name whose current status
+    is one of from_statuses. Returns count updated.
+    """
     rows = load_rows(path)
     updated = 0
     for r in rows:
-        if r.get("company_name") == company_name and r.get("status") == "Applied":
-            r["status"] = "Rejected"
+        if r.get("company_name") == company_name and r.get("status") in from_statuses:
+            r["status"] = new_status
             updated += 1
     if updated:
         save_rows(path, rows)
